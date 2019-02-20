@@ -49,6 +49,8 @@ var (
 
 // Request represents single request for mirroring one FTP directory or a file.
 type Request struct {
+	FileName string `json:"filename"`
+	Way      string `json:"way"`
 	Path     string `json:"path"`
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -91,7 +93,7 @@ func (request *Request) extractURL() (*url.URL, error) {
 	return url, nil
 }
 
-func makeLftpCmd(url *url.URL) string {
+func makeLftpCmd(url *url.URL, way string, filename string) string {
 	escaped := "/"
 
 	if url.Path != "" {
@@ -100,18 +102,28 @@ func makeLftpCmd(url *url.URL) string {
 
 	var cmd string
 
-	if url.Scheme == "ftp" && strings.HasSuffix(url.Path, "/") {
-		cmd = fmt.Sprintf("mirror --parallel=%d --use-pget-n=%d \"%s\" && exit", *p, *n, escaped)
-	} else {
-		cmd = fmt.Sprintf("pget -n %d \"%s\" && exit", *n, escaped)
+	if way == "down" {
+		if url.Scheme == "ftp" && strings.HasSuffix(url.Path, "/") {
+			cmd = fmt.Sprintf("mirror --parallel=%d --use-pget-n=%d \"%s\" && exit", *p, *n, escaped)
+		} else {
+			cmd = fmt.Sprintf("pget -n %d \"%s\" && exit", *n, escaped)
+		}
+	}
+	if way == "up" {
+		//if url.Scheme == "ftp" && strings.HasSuffix(url.Path, "/") {
+		//	cmd = fmt.Sprintf("mirror --parallel=%d --use-pget-n=%d \"%s\" && exit", *p, *n, escaped)
+		//} else {
+		///put -O /web/IGEHIRDETES/2019/2019-02-03/ SzaszLajos20190203.wav; bye
+		cmd = fmt.Sprintf("put -O \"%s\" \"%s\" && exit", escaped, filename)
+		//}
 	}
 
 	commands := []string{"set cmd:trace true", fmt.Sprintf("set net:max-retries %d", *maxRetries), cmd, "exit"}
 	return strings.Join(commands, "; ")
 }
 
-func makeCmd(url *url.URL, username, password string) *exec.Cmd {
-	lftpCmd := makeLftpCmd(url)
+func makeCmd(url *url.URL, username, password string, way string, FileName string) *exec.Cmd {
+	lftpCmd := makeLftpCmd(url, way, FileName)
 	var args []string
 
 	if username != "" && password != "" {
@@ -253,11 +265,12 @@ func (handler *Handler) processRequest(r *http.Request) (*JobID, error) {
 		return nil, err
 	}
 
+	///Ezt vagy LFTP file-olvasásra is fel kéne okosítani, vagy inkább kihagyni az ellenőrzést...
 	if err = connect(url, request.Username, request.Password); err != nil {
 		return nil, err
 	}
 
-	cmd := makeCmd(url, request.Username, request.Password)
+	cmd := makeCmd(url, request.Username, request.Password, request.Way, request.FileName)
 	scriptCmd, err := makeScriptCmd(url.Path)
 
 	if err != nil {
