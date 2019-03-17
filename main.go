@@ -141,7 +141,7 @@ func makeCmd(url *url.URL, username, password string, way string, FileName strin
 	return cmd
 }
 
-func makeScriptCmd(path string) (*exec.Cmd, error) {
+func makeScriptCmd(path string, filename string) (*exec.Cmd, error) {
 	if *s == "" {
 		return nil, nil
 	}
@@ -153,7 +153,10 @@ func makeScriptCmd(path string) (*exec.Cmd, error) {
 	}
 
 	outputPath := filepath.Join(*o, filepath.Base(path))
-	cmd := exec.Command(scriptPath, outputPath)
+	Info.Println(outputPath)
+	//cmd := exec.Command(scriptPath, outputPath)
+	//cmd := exec.Command(scriptPath, outputPath, filename)
+	cmd := exec.Command(scriptPath, filename)
 
 	cmd.Dir = *o
 	cmd.Stdout = os.Stdout
@@ -266,12 +269,12 @@ func (handler *Handler) processRequest(r *http.Request) (*JobID, error) {
 	}
 
 	///Ezt vagy LFTP file-olvasásra is fel kéne okosítani, vagy inkább kihagyni az ellenőrzést...
-	if err = connect(url, request.Username, request.Password); err != nil {
-		return nil, err
-	}
+	//if err = connect(url, request.Username, request.Password); err != nil {
+	//	return nil, err
+	//}
 
 	cmd := makeCmd(url, request.Username, request.Password, request.Way, request.FileName)
-	scriptCmd, err := makeScriptCmd(url.Path)
+	scriptCmd, err := makeScriptCmd(url.Path, request.FileName)
 
 	if err != nil {
 		Error.Printf("Error creating script command for request %s: %s", id, err.Error())
@@ -318,8 +321,10 @@ func (handler *Handler) worker() {
 		}
 
 		if err == nil && job.ScriptCmd != nil {
+			//if job.ScriptCmd != nil {
 			Info.Printf("Begin script output for request %s", job.ID)
 			err = job.ScriptCmd.Run()
+			//err := job.ScriptCmd.Run()
 			Info.Printf("End script output for request %s", job.ID)
 
 			if err != nil {
@@ -384,9 +389,9 @@ func main() {
 		log.Fatal("bcrypt failed to generate hashed token")
 	}
 
-	if _, err := exec.LookPath("lftp"); err != nil {
-		log.Fatal("LFTP not found")
-	}
+	//if _, err := exec.LookPath("lftp"); err != nil {
+	//	log.Fatal("LFTP not found")
+	//}
 
 	handler := &Handler{
 		Jobs:        make(chan *Job, 10),
